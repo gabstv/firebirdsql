@@ -621,6 +621,7 @@ func (p *wireProtocol) opAccept(user string, password string, authPluginName str
 				serverPublic := bigFromHexString(bytes_to_str(data[4+ln:]))
 				if len(user) > 2 && user[0] == '"' && user[len(user)-1] == '"' {
 					user = user[1 : len(user)-1]
+					user = strings.Replace(user, `""`, `"`, -1)
 				} else {
 					user = strings.ToUpper(user)
 				}
