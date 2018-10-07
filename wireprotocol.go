@@ -206,7 +206,7 @@ func (p *wireProtocol) uid(user string, password string, authPluginName string, 
 	hostnameBytes := bytes.NewBufferString(hostname).Bytes()
 	pluginListNameBytes := bytes.NewBufferString(PLUGIN_LIST).Bytes()
 	pluginNameBytes := bytes.NewBufferString(authPluginName).Bytes()
-	userBytes := bytes.NewBufferString(strings.ToUpper(user)).Bytes()
+	userBytes := bytes.NewBufferString(user).Bytes()
 	var wireCryptByte byte
 	if wireCrypt {
 		wireCryptByte = 1
@@ -619,7 +619,12 @@ func (p *wireProtocol) opAccept(user string, password string, authPluginName str
 				ln = int(bytes_to_int16(data[:2]))
 				serverSalt := data[2 : ln+2]
 				serverPublic := bigFromHexString(bytes_to_str(data[4+ln:]))
-				authData, sessionKey = getClientProof(strings.ToUpper(user), password, serverSalt, clientPublic, serverPublic, clientSecret, p.pluginName)
+				if len(user) > 2 && user[0] == '"' && user[len(user)-1] == '"' {
+					user = user[1 : len(user)-1]
+				} else {
+					user = strings.ToUpper(user)
+				}
+				authData, sessionKey = getClientProof(user, password, serverSalt, clientPublic, serverPublic, clientSecret, p.pluginName)
 				if DEBUG_SRP {
 					fmt.Printf("pluginName=%s\nserverSalt=%s\nserverPublic(bin)=%s\nserverPublic=%s\nauthData=%v,sessionKey=%v\n",
 						p.pluginName, serverSalt, data[4+ln:], serverPublic, authData, sessionKey)
@@ -1035,10 +1040,11 @@ func (p *wireProtocol) opResponse() (int32, []byte, []byte, error) {
 		_, _, _, _ = p._parse_op_response()
 		b, _ = p.recvPackets(4)
 	}
-
-	if bytes_to_bint32(b) != op_response {
+	if bytes_to_bint32(b) == op_cont_auth {
+		return 0, nil, nil, errors.New("opResponse() Unauthorized")
+	} else if bytes_to_bint32(b) != op_response {
 		if DEBUG_SRP && bytes_to_bint32(b) == op_cont_auth {
-			panic("auth error")
+			panic("protocol error")
 		}
 		return 0, nil, nil, errors.New(fmt.Sprintf("Error op_response:%d", bytes_to_bint32(b)))
 	}
