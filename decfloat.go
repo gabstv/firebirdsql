@@ -117,10 +117,11 @@ func calcSignificand(prefix int64, dpdBits big.Int, numBits int) *big.Int {
 	return v
 }
 
-func decimal128ToSignDigitsExponent(b []byte) (sign int, digits int, exponent int) {
+func decimal128ToSignDigitsExponent(b []byte) (v decimal.Decimal, sign int, digits int, exponent int) {
 	// https://en.wikipedia.org/wiki/Decimal128_floating-point_format
 	// TODO:
-	return 0, 0, 0
+	v = decimal.Zero
+	return
 }
 
 func decimalFixedToDecimal(b []byte, scale int) decimal.Decimal {
