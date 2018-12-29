@@ -26,10 +26,10 @@ package firebirdsql
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/shopspring/decimal"
 	"math"
 	"reflect"
 	"time"
-	"github.com/shopspring/decimal"
 )
 
 const (

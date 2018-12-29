@@ -27,23 +27,80 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func dpdToInt(dpd uint16) int {
-    // Convert DPD encodined value to int (0-999)
-    // dpd: DPD encoded value. 10bit unsigned int
+func dpdBitToInt(dpd uint16, mask uint16) int {
+	if (dpd & mask) != 0 {
+		return 1
+	} else {
+		return 0
+	}
+}
 
-	return 0
+func dpdToInt(dpd uint16) int {
+	// Convert DPD encodined value to int (0-999)
+	// dpd: DPD encoded value. 10bit unsigned int
+
+	b := make([]int, 10)
+	b[9] = dpdBitToInt(dpd, 0x0200)
+	b[8] = dpdBitToInt(dpd, 0x0100)
+	b[7] = dpdBitToInt(dpd, 0x0080)
+	b[6] = dpdBitToInt(dpd, 0x0040)
+	b[5] = dpdBitToInt(dpd, 0x0020)
+	b[4] = dpdBitToInt(dpd, 0x0010)
+	b[3] = dpdBitToInt(dpd, 0x0008)
+	b[2] = dpdBitToInt(dpd, 0x0004)
+	b[1] = dpdBitToInt(dpd, 0x0002)
+	b[0] = dpdBitToInt(dpd, 0x0001)
+
+	d := make([]int, 3)
+	if b[3] == 0 {
+		d[2] = b[9]*4 + b[8]*2 + b[7]
+		d[1] = b[6]*4 + b[5]*2 + b[4]
+		d[0] = b[2]*4 + b[1]*2 + b[0]
+	} else if b[3] == 1 && b[2] == 0 && b[1] == 0 {
+		d[2] = b[9]*4 + b[8]*2 + b[7]
+		d[1] = b[6]*4 + b[5]*2 + b[4]
+		d[0] = 8 + b[0]
+	} else if b[3] == 1 && b[2] == 0 && b[1] == 1 {
+		d[2] = b[9]*4 + b[8]*2 + b[7]
+		d[1] = 8 + b[4]
+		d[0] = b[6]*4 + b[5]*2 + b[0]
+	} else if b[3] == 1 && b[2] == 1 && b[1] == 0 {
+		d[2] = 8 + b[7]
+		d[1] = b[6]*4 + b[5]*2 + b[4]
+		d[0] = b[9]*4 + b[8]*2 + b[0]
+	} else if b[6] == 0 && b[5] == 0 && b[3] == 1 && b[2] == 1 && b[1] == 1 {
+		d[2] = 8 + b[7]
+		d[1] = 8 + b[4]
+		d[0] = b[9]*4 + b[8]*2 + b[0]
+	} else if b[6] == 0 && b[5] == 1 && b[3] == 1 && b[2] == 1 && b[1] == 1 {
+		d[2] = 8 + b[7]
+		d[1] = b[9]*4 + b[8]*2 + b[4]
+		d[0] = 8 + b[0]
+	} else if b[6] == 1 && b[5] == 0 && b[3] == 1 && b[2] == 1 && b[1] == 1 {
+		d[2] = b[9]*4 + b[8]*2 + b[7]
+		d[1] = 8 + b[4]
+		d[0] = 8 + b[0]
+	} else if b[6] == 1 && b[5] == 1 && b[3] == 1 && b[2] == 1 && b[1] == 1 {
+		d[2] = 8 + b[7]
+		d[1] = 8 + b[4]
+		d[0] = 8 + b[0]
+	} else {
+		panic("Invalid DPD encoding")
+	}
+
+	return d[2]*100 + d[1]*10 + d[0]
 }
 
 func calcSignificand(prefix int64, dpdBits uint16, numBits int) int64 {
-    // prefix: High bits integer value
-    // dpdBits: dpd encoded bits
-    // numBits: bit length of dpd_bits
-    // https://en.wikipedia.org/wiki/Decimal128_floating-point_format#Densely_packed_decimal_significand_field
+	// prefix: High bits integer value
+	// dpdBits: dpd encoded bits
+	// numBits: bit length of dpd_bits
+	// https://en.wikipedia.org/wiki/Decimal128_floating-point_format#Densely_packed_decimal_significand_field
 
 	return 0
 }
 
-func decimal128ToSignDigitsExponent(b []byte) (sign int, digits int, exponent int){
+func decimal128ToSignDigitsExponent(b []byte) (sign int, digits int, exponent int) {
 	// https://en.wikipedia.org/wiki/Decimal128_floating-point_format
 	return 0, 0, 0
 }
@@ -53,6 +110,6 @@ func decimalFixedToDecimal(b []byte, scale int) decimal.Decimal {
 }
 
 func decimal128ToDecimal(b []byte) decimal.Decimal {
-    // https://en.wikipedia.org/wiki/Decimal64_floating-point_format
+	// https://en.wikipedia.org/wiki/Decimal64_floating-point_format
 	return decimal.Zero
 }
