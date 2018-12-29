@@ -25,9 +25,10 @@ package firebirdsql
 
 import (
 	"github.com/shopspring/decimal"
+	"math/big"
 )
 
-func dpdBitToInt(dpd uint16, mask uint16) int {
+func dpdBitToInt(dpd uint, mask uint) int {
 	if (dpd & mask) != 0 {
 		return 1
 	} else {
@@ -35,7 +36,7 @@ func dpdBitToInt(dpd uint16, mask uint16) int {
 	}
 }
 
-func dpdToInt(dpd uint16) int {
+func dpdToInt(dpd uint) int {
 	// Convert DPD encodined value to int (0-999)
 	// dpd: DPD encoded value. 10bit unsigned int
 
@@ -91,25 +92,44 @@ func dpdToInt(dpd uint16) int {
 	return d[2]*100 + d[1]*10 + d[0]
 }
 
-func calcSignificand(prefix int64, dpdBits uint16, numBits int) int64 {
+func calcSignificand(prefix int64, dpdBits big.Int, numBits int) *big.Int {
 	// prefix: High bits integer value
 	// dpdBits: dpd encoded bits
 	// numBits: bit length of dpd_bits
 	// https://en.wikipedia.org/wiki/Decimal128_floating-point_format#Densely_packed_decimal_significand_field
+	numSegments := numBits / 10
+	segments := make([]uint, numSegments)
+	bi1024 := big.NewInt(1024)
 
-	return 0
+	for i := 0; i < numSegments; i++ {
+		work := dpdBits
+		segments[numSegments-i-1] = uint(dpdBits.Mod(&work, bi1024).Int64())
+		dpdBits.Rsh(&dpdBits, 10)
+	}
+
+	v := big.NewInt(prefix)
+	bi1000 := big.NewInt(1000)
+	for _, dpd := range segments {
+		v.Mul(v, bi1000)
+		v.Add(v, big.NewInt(int64(dpd)))
+	}
+
+	return v
 }
 
 func decimal128ToSignDigitsExponent(b []byte) (sign int, digits int, exponent int) {
 	// https://en.wikipedia.org/wiki/Decimal128_floating-point_format
+	// TODO:
 	return 0, 0, 0
 }
 
 func decimalFixedToDecimal(b []byte, scale int) decimal.Decimal {
+	// TODO:
 	return decimal.Zero
 }
 
 func decimal128ToDecimal(b []byte) decimal.Decimal {
 	// https://en.wikipedia.org/wiki/Decimal64_floating-point_format
+	// TODO:
 	return decimal.Zero
 }
