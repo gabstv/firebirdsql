@@ -135,8 +135,20 @@ func decimalFixedToDecimal(b []byte, scale int32) decimal.Decimal {
 	return decimal.NewFromBigInt(&digits, scale)
 }
 
+func decimal64ToDecimal(b []byte) decimal.Decimal {
+    // https://en.wikipedia.org/wiki/Decimal64_floating-point_format
+	// TODO:
+	return decimal128ToDecimal(b)
+}
+
 func decimal128ToDecimal(b []byte) decimal.Decimal {
 	// https://en.wikipedia.org/wiki/Decimal64_floating-point_format
-	// TODO:
-	return decimal.Zero
+	v, sign, digits, exponent := decimal128ToSignDigitsExponent(b)
+	if v != nil {
+		return *v
+	}
+	if sign != 0 {
+		digits.Mul(&digits, big.NewInt(-1))
+	}
+	return decimal.NewFromBigInt(&digits, exponent)
 }
