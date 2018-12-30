@@ -25,6 +25,7 @@ package firebirdsql
 
 import (
 	"github.com/shopspring/decimal"
+	"math"
 	"math/big"
 )
 
@@ -119,8 +120,56 @@ func calcSignificand(prefix int64, dpdBits big.Int, numBits int) *big.Int {
 
 func decimal128ToSignDigitsExponent(b []byte) (v *decimal.Decimal, sign int, digits big.Int, exponent int32) {
 	// https://en.wikipedia.org/wiki/Decimal128_floating-point_format
+
+	var significand_prefix uint64
+	if (b[0] & 0x80) == 0x80 {
+		sign = 1
+	}
+	combination_field := (uint32(b[0] & 0x7f) << 10) + uint32(b[1] << 2) + uint32(b[2] >> 6)
+	if (combination_field & 0x1F000) == 0x1F000 {
+		var d decimal.Decimal
+		if sign == 1 {
+			// Is there -NaN ?
+			d = decimal.NewFromFloat(math.NaN())
+		} else {
+			d = decimal.NewFromFloat(math.NaN())
+		}
+		v = &d
+		return
+	} else if (combination_field & 0x1F000) == 0x1E000 {
+		var d decimal.Decimal
+		if sign == 1 {
+			d = decimal.NewFromFloat(math.Inf(-1))
+		} else {
+			d = decimal.NewFromFloat(math.Inf(1))
+		}
+		v = &d
+		return
+    } else if (combination_field & 0x18000) == 0x00000 {
+        exponent = int32(0x0000 + (combination_field & 0x00fff))
+        significand_prefix = uint64((combination_field >> 12) & 0x07)
+	} else if (combination_field & 0x18000) == 0x08000 {
+        exponent = int32(0x1000 + (combination_field & 0x00fff))
+        significand_prefix = uint64((combination_field >> 12) & 0x07)
+    } else if (combination_field & 0x18000) == 0x10000 {
+        exponent = int32(0x2000 + (combination_field & 0x00fff))
+        significand_prefix = uint64((combination_field >> 12) & 0x07)
+    } else if  (combination_field & 0x1e000) == 0x18000 {
+        exponent = int32(0x0000 + (combination_field & 0x00fff))
+        significand_prefix = uint64(8 + (combination_field >> 12) & 0x01)
+    } else if  (combination_field & 0x1e000) == 0x1a000 {
+        exponent = int32(0x1000 + (combination_field & 0x00fff))
+        significand_prefix = uint64(8 + (combination_field >> 12) & 0x01)
+    } else if  (combination_field & 0x1e000) == 0x1c000 {
+        exponent = int32(0x2000 + (combination_field & 0x00fff))
+        significand_prefix = uint64(8 + (combination_field >> 12) & 0x01)
+	} else {
+        panic("decimal128 value error")
+	}
+    exponent -= 6176
+
 	// TODO:
-	v = &decimal.Zero
+
 	return
 }
 
