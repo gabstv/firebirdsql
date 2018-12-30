@@ -93,7 +93,7 @@ func dpdToInt(dpd uint) int {
 	return d[2]*100 + d[1]*10 + d[0]
 }
 
-func calcSignificand(prefix int64, dpdBits big.Int, numBits int) *big.Int {
+func calcSignificand(prefix int64, dpdBits *big.Int, numBits int) *big.Int {
 	// prefix: High bits integer value
 	// dpdBits: dpd encoded bits
 	// numBits: bit length of dpd_bits
@@ -103,9 +103,10 @@ func calcSignificand(prefix int64, dpdBits big.Int, numBits int) *big.Int {
 	bi1024 := big.NewInt(1024)
 
 	for i := 0; i < numSegments; i++ {
-		work := dpdBits
+		var work big.Int
+		work = *dpdBits
 		segments[numSegments-i-1] = uint(dpdBits.Mod(&work, bi1024).Int64())
-		dpdBits.Rsh(&dpdBits, 10)
+		dpdBits.Rsh(dpdBits, 10)
 	}
 
 	v := big.NewInt(prefix)
@@ -118,15 +119,15 @@ func calcSignificand(prefix int64, dpdBits big.Int, numBits int) *big.Int {
 	return v
 }
 
-func decimal128ToSignDigitsExponent(b []byte) (v *decimal.Decimal, sign int, digits big.Int, exponent int32) {
+func decimal128ToSignDigitsExponent(b []byte) (v *decimal.Decimal, sign int, digits *big.Int, exponent int32) {
 	// https://en.wikipedia.org/wiki/Decimal128_floating-point_format
 
-	var significand_prefix uint64
+	var prefix int64
 	if (b[0] & 0x80) == 0x80 {
 		sign = 1
 	}
-	combination_field := (uint32(b[0] & 0x7f) << 10) + uint32(b[1] << 2) + uint32(b[2] >> 6)
-	if (combination_field & 0x1F000) == 0x1F000 {
+	cf := (uint32(b[0]&0x7f) << 10) + uint32(b[1]<<2) + uint32(b[2]>>6)
+	if (cf & 0x1F000) == 0x1F000 {
 		var d decimal.Decimal
 		if sign == 1 {
 			// Is there -NaN ?
@@ -136,7 +137,7 @@ func decimal128ToSignDigitsExponent(b []byte) (v *decimal.Decimal, sign int, dig
 		}
 		v = &d
 		return
-	} else if (combination_field & 0x1F000) == 0x1E000 {
+	} else if (cf & 0x1F000) == 0x1E000 {
 		var d decimal.Decimal
 		if sign == 1 {
 			d = decimal.NewFromFloat(math.Inf(-1))
@@ -145,30 +146,33 @@ func decimal128ToSignDigitsExponent(b []byte) (v *decimal.Decimal, sign int, dig
 		}
 		v = &d
 		return
-    } else if (combination_field & 0x18000) == 0x00000 {
-        exponent = int32(0x0000 + (combination_field & 0x00fff))
-        significand_prefix = uint64((combination_field >> 12) & 0x07)
-	} else if (combination_field & 0x18000) == 0x08000 {
-        exponent = int32(0x1000 + (combination_field & 0x00fff))
-        significand_prefix = uint64((combination_field >> 12) & 0x07)
-    } else if (combination_field & 0x18000) == 0x10000 {
-        exponent = int32(0x2000 + (combination_field & 0x00fff))
-        significand_prefix = uint64((combination_field >> 12) & 0x07)
-    } else if  (combination_field & 0x1e000) == 0x18000 {
-        exponent = int32(0x0000 + (combination_field & 0x00fff))
-        significand_prefix = uint64(8 + (combination_field >> 12) & 0x01)
-    } else if  (combination_field & 0x1e000) == 0x1a000 {
-        exponent = int32(0x1000 + (combination_field & 0x00fff))
-        significand_prefix = uint64(8 + (combination_field >> 12) & 0x01)
-    } else if  (combination_field & 0x1e000) == 0x1c000 {
-        exponent = int32(0x2000 + (combination_field & 0x00fff))
-        significand_prefix = uint64(8 + (combination_field >> 12) & 0x01)
+	} else if (cf & 0x18000) == 0x00000 {
+		exponent = int32(0x0000 + (cf & 0x00fff))
+		prefix = int64((cf >> 12) & 0x07)
+	} else if (cf & 0x18000) == 0x08000 {
+		exponent = int32(0x1000 + (cf & 0x00fff))
+		prefix = int64((cf >> 12) & 0x07)
+	} else if (cf & 0x18000) == 0x10000 {
+		exponent = int32(0x2000 + (cf & 0x00fff))
+		prefix = int64((cf >> 12) & 0x07)
+	} else if (cf & 0x1e000) == 0x18000 {
+		exponent = int32(0x0000 + (cf & 0x00fff))
+		prefix = int64(8 + (cf>>12)&0x01)
+	} else if (cf & 0x1e000) == 0x1a000 {
+		exponent = int32(0x1000 + (cf & 0x00fff))
+		prefix = int64(8 + (cf>>12)&0x01)
+	} else if (cf & 0x1e000) == 0x1c000 {
+		exponent = int32(0x2000 + (cf & 0x00fff))
+		prefix = int64(8 + (cf>>12)&0x01)
 	} else {
-        panic("decimal128 value error")
+		panic("decimal128 value error")
 	}
-    exponent -= 6176
+	exponent -= 6176
 
-	// TODO:
+	dpdBits := bytesToBig(b)
+	mask := bigFromHexString("3fffffffffffffffffffffffffff")
+	dpdBits.Add(dpdBits, mask)
+	digits = calcSignificand(prefix, dpdBits, 110)
 
 	return
 }
@@ -179,13 +183,13 @@ func decimalFixedToDecimal(b []byte, scale int32) decimal.Decimal {
 		return *v
 	}
 	if sign != 0 {
-		digits.Mul(&digits, big.NewInt(-1))
+		digits.Mul(digits, big.NewInt(-1))
 	}
-	return decimal.NewFromBigInt(&digits, scale)
+	return decimal.NewFromBigInt(digits, scale)
 }
 
 func decimal64ToDecimal(b []byte) decimal.Decimal {
-    // https://en.wikipedia.org/wiki/Decimal64_floating-point_format
+	// https://en.wikipedia.org/wiki/Decimal64_floating-point_format
 	// TODO:
 	return decimal128ToDecimal(b)
 }
@@ -197,7 +201,7 @@ func decimal128ToDecimal(b []byte) decimal.Decimal {
 		return *v
 	}
 	if sign != 0 {
-		digits.Mul(&digits, big.NewInt(-1))
+		digits.Mul(digits, big.NewInt(-1))
 	}
-	return decimal.NewFromBigInt(&digits, exponent)
+	return decimal.NewFromBigInt(digits, exponent)
 }
