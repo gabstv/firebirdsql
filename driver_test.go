@@ -307,7 +307,9 @@ func TestInsertTimestamp(t *testing.T) {
 
 /*
 func TestBoolean(t *testing.T) {
-	conn, err := sql.Open("firebirdsql_createdb", "sysdba:masterkey@localhost:3050/tmp/go_test_fb3.fdb")
+	temppath := TempFileName("test_boolean_")
+
+	conn, err := sql.Open("firebirdsql_createdb", "sysdba:masterkey@localhost:3050"+temppath)
 	if err != nil {
 		t.Fatalf("Error connecting: %v", err)
 	}
