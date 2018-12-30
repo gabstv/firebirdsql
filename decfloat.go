@@ -190,8 +190,60 @@ func decimalFixedToDecimal(b []byte, scale int32) decimal.Decimal {
 
 func decimal64ToDecimal(b []byte) decimal.Decimal {
 	// https://en.wikipedia.org/wiki/Decimal64_floating-point_format
-	// TODO:
-	return decimal128ToDecimal(b)
+	var prefix int64
+	var sign int
+	if (b[0] & 0x80) == 0x80 {
+		sign = 1
+	}
+
+	cf := (uint32(b[0]) >> 2) & 0x1f
+	exponent := ((int32(b[0]) & 3) << 6) + ((int32(b[1]) >> 2) & 0x3f)
+
+	dpdBits := bytesToBig(b)
+	mask := bigFromHexString("3ffffffffffff")
+	dpdBits.Add(dpdBits, mask)
+
+	if cf == 0x1f {
+		if sign == 1 {
+			// Is there -NaN ?
+			return decimal.NewFromFloat(math.NaN())
+		} else {
+			return decimal.NewFromFloat(math.NaN())
+		}
+	} else if cf == 0x1e {
+		if sign == 1 {
+			return decimal.NewFromFloat(math.Inf(-1))
+		} else {
+			return decimal.NewFromFloat(math.Inf(1))
+		}
+	} else if (cf & 0x18) == 0x00 {
+		exponent = 0x000 + exponent
+		prefix = int64(cf & 0x07)
+	} else if (cf & 0x18) == 0x08 {
+		exponent = 0x100 + exponent
+		prefix = int64(cf & 0x07)
+	} else if (cf & 0x18) == 0x10 {
+		exponent = 0x200 + exponent
+		prefix = int64(cf & 0x07)
+	} else if (cf & 0x1e) == 0x18 {
+		exponent = 0x000 + exponent
+		prefix = int64(8 + cf&1)
+	} else if (cf & 0x1e) == 0x1a {
+		exponent = 0x100 + exponent
+		prefix = int64(8 + cf&1)
+	} else if (cf & 0x1e) == 0x1c {
+		exponent = 0x200 + exponent
+		prefix = int64(8 + cf&1)
+	} else {
+		panic("decimal64 value error")
+	}
+	digits := calcSignificand(prefix, dpdBits, 50)
+	exponent -= 398
+
+	if sign != 0 {
+		digits.Mul(digits, big.NewInt(-1))
+	}
+	return decimal.NewFromBigInt(digits, exponent)
 }
 
 func decimal128ToDecimal(b []byte) decimal.Decimal {
