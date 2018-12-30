@@ -28,6 +28,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -361,6 +362,49 @@ func TestBoolean(t *testing.T) {
 	conn.Close()
 }
 */
+
+func TestDecFloat(t *testing.T) {
+	temppath := TempFileName("test_decfloat_")
+
+	conn, err := sql.Open("firebirdsql_createdb", "sysdba:masterkey@localhost:3050"+temppath)
+	if err != nil {
+		t.Fatalf("Error connecting: %v", err)
+	}
+	var sql string
+	var n int
+
+	sql = "SELECT Count(*) FROM rdb$relations where rdb$relation_name='TEST_DECFLOAT'"
+	err = conn.QueryRow(sql).Scan(&n)
+	if err != nil {
+		t.Fatalf("Error QueryRow: %v", err)
+	}
+	if n > 0 {
+		conn.Exec("DROP TABLE test_decfloat")
+	}
+
+	sql = `
+        CREATE TABLE test_decfloat (
+            d DECIMAL(20, 2),
+            df64 DECFLOAT(16),
+            df128 DECFLOAT(34)
+        )
+    `
+	conn.Exec(sql)
+	conn.Exec("insert into test_decfloat(d, df64, df128, s) values (0.0, 0.0, 0.0, '0.0')")
+	conn.Exec("insert into test_decfloat(d, df64, df128, s) values (1.0, 1.0, 1.0, '1.0')")
+	conn.Exec("insert into test_decfloat(d, df64, df128, s) values (20.0, 20.0, 20.0, '20.0')")
+	conn.Exec("insert into test_decfloat(d, df64, df128, s) values (-1.0, -1.0, -1.0, '-1.0')")
+	conn.Exec("insert into test_decfloat(d, df64, df128, s) values (-20.0, -20.0, -20.0, '-20.0')")
+
+	rows, err := conn.Query("select * from test_decfloat")
+	var d, df64, df128 decimal.Decimal
+
+	for rows.Next() {
+		rows.Scan(&d, &df64, &df128)
+	}
+
+	conn.Close()
+}
 
 func TestLegacyAuthWireCrypt(t *testing.T) {
 	temppath := TempFileName("test_legacy_atuh_")
