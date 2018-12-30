@@ -334,6 +334,12 @@ func (x *xSQLVAR) value(raw_value []byte) (v interface{}, err error) {
 		v = raw_value[0] != 0
 	case SQL_TYPE_BLOB:
 		v = raw_value
+	case SQL_TYPE_DEC_FIXED:
+		v = decimalFixedToDecimal(raw_value, int32(x.sqlscale))
+	case SQL_TYPE_DEC64:
+		v = decimal64ToDecimal(raw_value)
+	case SQL_TYPE_DEC128:
+		v = decimal128ToDecimal(raw_value)
 	}
 	return
 }
