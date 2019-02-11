@@ -40,7 +40,7 @@ import (
 	"time"
 
 	"github.com/kardianos/osext"
-	"gitlab.com/nyarla/go-crypt"
+	crypt "gitlab.com/nyarla/go-crypt"
 	//"unsafe"
 )
 
@@ -468,7 +468,6 @@ func (p *wireProtocol) _parse_connect_response(user string, password string, opt
 
 	return
 }
-
 
 func (p *wireProtocol) _parse_select_items(buf []byte, xsqlda []xSQLVAR) (int, error) {
 	var err error
